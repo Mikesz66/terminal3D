@@ -1,68 +1,46 @@
 #include "engine.h"
-#include <stdlib.h>
-
-int main(int argc, char **argv) {
-	// check if the command line arguments are correct
-	if (argc != 3) {
-		printf("Usage: ./engine (terminal width) (terminal height)\n");
-		return 1;
-	}
-
-	int screen_width = atoi(argv[1]);	// change input from string to int
-	int screen_height = atoi(argv[2]);
-
-	if (screen_width < 1 || screen_height < 1) { 		// check if the screen dimensions are not 0 and not negative
-		printf("Invalid screen dimensions\n");
-		return 1;
-	}
-
-	// create pointer to video memory struct
-	VideoMemory* memory = createVideoMemory(screen_width, screen_height); 
-	
-
-	// basic initialization
-	initscr();		// init ncurses screen	
-	noecho();		// don't show pressed keys
-	curs_set(0);		// hide cursor
-	initVideoMemory(memory);	// init video memory to blank spaces
-	
-	// engine loop
-	putPixel(0, 0, 1, memory);
-	refreshScreen(memory);
-	
-	// end of program
-	refresh();		// show what's on the screen
-	getch();		// wait for user input to close application
-	
-	freeVideoMemory(memory);
-	endwin();		// close ncurses session
-	return 0;
-}
 
 VideoMemory* createVideoMemory(int width, int height) {
 	VideoMemory* vm = malloc(sizeof(VideoMemory));			// allocate memory for struct
+	if (!vm) return NULL;
 	vm->width = width;			// assing variables
 	vm->height = height;
 
 	vm->contents = malloc(height * sizeof(int*));		// allocate memory for y dimension of two dimensional array
+	if (!vm->contents) {
+		free(vm);
+		return NULL;
+	}
+
 	for (int i = 0; i < height; i++) {			// allocate memory for x dimension of two dimensional array
 		vm->contents[i] = malloc(width * sizeof(int));
+		if (!vm->contents[i]) {
+			for (int j = 0; j < i; j++) {
+				free(vm->contents[j]);
+			}
+			free(vm->contents);
+			free(vm);
+			return NULL;
+		}
 	}
 	return vm;
 }
 
-void freeVideoMemory(VideoMemory* vm) {
+void freeVideoMemory(VideoMemory** vmPtr) {
+	if (!vmPtr || !*vmPtr) return;
+	VideoMemory* vm = *vmPtr;
 	for (int i = 0; i < vm->height; i++) {		// free x dimension of two dimensional array
 		free(vm->contents[i]);
 	}
 	free(vm->contents);		// free y dimension of two dimensional array
 	free(vm);		// free the rest of the struct
+	*vmPtr = NULL;
 }
 
-void initVideoMemory(VideoMemory* memory) {
+void clearVideoMemory(VideoMemory* memory) {
 	for (int y = 0; y < memory->height ; y++) {		// loop through all rows in video memory
 		for (int x = 0; x < memory->width; x++) {	// loop through all elements in row in video memory
-			memory->contents[y][x] = 0;	// initialize element to blank space
+			memory->contents[y][x] = 0;	// clear element to blank space
 		}
 	}
 }
@@ -88,10 +66,23 @@ void refreshScreen(VideoMemory* memory) {
 					addch(' ');
 					break;
 				case 1:
+					addch('.');
+					break;
+				case 2:
+					addch(':');
+					break;
+				case 3:
 					addch('#');
 					break;
 			}
 		}
 	}
 	refresh(); 	// refresh ncurses terminal screen to see the pixels
+}
+
+void initNCurses() {
+	initscr();
+	noecho();
+	curs_set(0);
+	nodelay(stdscr, TRUE);
 }
